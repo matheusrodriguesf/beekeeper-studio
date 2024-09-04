@@ -11,15 +11,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Cache Node.js modules
+      - name: Cache Yarn modules
         uses: actions/cache@v3
         with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/yarn.lock') }}
+          path: ~/.cache/yarn
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-node-
-      - run: npm install
-      - run: npm run build
+            ${{ runner.os }}-yarn-
+      - run: yarn install
+      - run: yarn build
 
   test:
     needs: build
@@ -29,12 +29,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Cache Node.js modules
+      - name: Cache Yarn modules
         uses: actions/cache@v3
         with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/yarn.lock') }}
+          path: ~/.cache/yarn
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-node-
-      - run: npm install
-      - run: npm test
+            ${{ runner.os }}-yarn-
+      - run: yarn install
+      - run: yarn test
