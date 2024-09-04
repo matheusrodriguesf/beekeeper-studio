@@ -19,7 +19,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - run: yarn install
-      - run: yarn build
+      - run: yarn bks:build
 
   test:
     needs: build
@@ -37,4 +37,4 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - run: yarn install
-      - run: yarn test
+      - run: yarn test:ci
