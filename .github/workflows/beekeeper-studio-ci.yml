@@ -1,10 +1,7 @@
 name: Beekeeper Studio CI
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -41,4 +38,3 @@ jobs:
             ${{ runner.os }}-node-
       - run: npm ci
       - run: npm test
-
