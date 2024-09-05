@@ -20,6 +20,8 @@ jobs:
             ${{ runner.os }}-yarn-
       - run: yarn install
       - run: yarn electron:build
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
   test:
     needs: build
