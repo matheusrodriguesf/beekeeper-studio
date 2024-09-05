@@ -19,7 +19,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - run: yarn install
-      - run: yarn bks:build
+      - run: yarn electron:build
 
   test:
     needs: build
