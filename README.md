@@ -1,18 +1,35 @@
-# Beekeeper Studio (Community Edition)
+# Beekeeper Studio (Community Edition) - Fork para Estudo de Caso CI/CD
 
-Beekeeper Studio is a cross-platform SQL editor and database manager available for Linux, Mac, and Windows. Beekeeper Studio Community Edition is GPL licensed so it is free (libre) and free (gratis).
+Este repositório é um **fork** do repositório oficial do [Beekeeper Studio](https://github.com/beekeeper-studio/beekeeper-studio). O objetivo deste fork é realizar um **estudo de caso sobre pipelines CI/CD** e também criar um **Dockerfile** para facilitar a execução da aplicação em ambientes locais, sem a necessidade de compilar o código ou configurar manualmente as dependências.
 
-[Download the community edition here](https://beekeeperstudio.io/get-community)
+## Objetivos do Fork
 
-We publish binaries for MacOS, Windows, and Linux.
+1. **Estudo de Caso CI/CD**: 
+   - Implementação de um pipeline de CI/CD utilizando o GitHub Actions para automatizar o build, testes, análise de código e publicação de imagens Docker.
+   - Exploração de boas práticas para automatizar e otimizar o processo de desenvolvimento e entrega contínua de software.
 
-![image](https://user-images.githubusercontent.com/279769/203650152-4a34af1f-8a38-47cf-a273-d34d1c84feeb.png)
+2. **Criação de um Dockerfile**:
+   - Construção de um Dockerfile que encapsula a aplicação Beekeeper Studio e todas as suas dependências, permitindo que o aplicativo seja executado facilmente em qualquer ambiente com suporte a Docker.
+   - Publicação da imagem Docker no Docker Hub.
+
+## Pipeline de CI/CD
+
+O pipeline de CI/CD configurado neste projeto inclui as seguintes etapas:
+- **Build**: Constrói a aplicação e gera uma imagem Docker.
+- **Test**: Executa os testes automatizados para verificar a integridade da aplicação.
+- **Analyze**: Realiza a análise estática do código para garantir a qualidade e segurança do código.
+- **Publish**: Publica a imagem Docker gerada no Docker Hub, utilizando tags específicas para a versão da aplicação.
+
+## Sobre Beekeeper Studio
+Beekeeper Studio é um gerenciador de banco de dados e editor SQL que fornece uma interface gráfica intuitiva para se conectar a diversos bancos de dados, como MySQL, PostgreSQL e SQLite. Como ele podemos gerenciar schema, executar consultas SQL, visualizar e editar dados. O histórico de consultas, o suporte a múltiplas abas e os temas personalizáveis são alguns dos recursos presentes no software.
+
+Disponível para Linux, Mac e Windows, o Beekeeper Studio é um software multiplataforma. A versão Community Edition, que é distribuída e sob a GPL, ou seja, é gratuita e livre para uso e modificação, foi a escolhida para o estudo de caso.
+
+[Baixe a edição da comunidade aqui](https://beekeeperstudio.io/get-community)
 
 
-👉 [Join the community Slack](https://launchpass.com/beekeeperstud-lvg5276)
 
-
-## Supported Databases
+## Suporte aos Bancos de Dados
 
 <!-- SUPPORT_BEGIN -->
 
@@ -39,213 +56,180 @@ We publish binaries for MacOS, Windows, and Linux.
 | [Redis](https://redis.io/)                               | 🗓️ Planned for V5               |           |    ✅    |       -- |
 | [DynamoDB](https://aws.amazon.com/dynamodb/)             | 🗓️ Planned for V5               |           |    ✅    |       -- |
 
+## Ferramentas Utilizadas
+
+### 1. **GitHub Actions**
+O GitHub Actions foi escolhido para orquestrar o pipeline devido à sua integração nativa com o GitHub e à facilidade de configurar workflows automáticos para execução de testes, builds e publicações de imagens Docker.
+
+### 2. **Docker**
+Docker foi utilizado para garantir a consistência do ambiente de desenvolvimento e produção, encapsulando a aplicação e suas dependências em contêineres. O uso de Docker no pipeline permite a construção e publicação de imagens que podem ser facilmente replicadas em diferentes ambientes.
 
 
+## Estrutura do Pipeline
 
-<!-- SUPPORT_END -->
+O pipeline está dividido em quatro jobs principais, cada um com um papel específico no ciclo de vida da integração e entrega contínua. Todos os jobs são disparados automaticamente quando há mudanças no repositório, garantindo que a aplicação esteja sempre testada.
 
-## Editions of Beekeeper Studio
+#### Job: Build
 
-1. **Beekeeper Studio Ultimate Edition** - The full version of Beekeeper Studio with all features. Buying Beekeeper Studio is also the best way to support the community edition. [Download link](https://beekeeperstudio.io/get)
+O job de **build** realiza a construção da aplicação. Ele usa a ação `actions/setup-node@v4` para configuração no Node.Js.
 
-2. **Beekeeper Studio Community Edition** - This repository. This is the open source version of Beekeeper Studio. It is a full featured database management client that is totally free and open source. [Download Link](https://beekeeperstudio.io/get-community)
+```yaml
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Cache Yarn modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/yarn
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - run: yarn install
+      - run: yarn electron:build
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+```
+
+### Job: Test
+
+O job de `test` garante que todos os testes sejam executados automaticamente, proporcionando feedback imediato da aplicação.
+
+```yaml
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Cache Yarn modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/yarn
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - run: yarn install
+      - run: yarn test:ci
+```
+
+### Job: Analise de Codigo 
+
+O job de `analyze` utiliza a ferramenta de análise estática de código `CodeQL` para garantir que o código segue boas práticas e não contém vulnerabilidades ou bugs críticos.
+
+```yaml
+  analyze:
+    needs: build
+    name: Analyze Code Quality
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript, typescript
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+      - name: Upload CodeQL Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: codeql-results
+          path: codeql-results/
+```
+
+### Job: Publish
+O job de `publish` é responsável por gerar e publicar a imagem Docker no Docker Hub. Esse processo automatizado e garante que a imagem esteja disponível publicamente e pronta para ser utilizada.
+
+```yaml
+  publish:
+    needs: [test, analyze]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Login no Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Construir e publicar imagem Docker
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:${{ github.sha }}
+            ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:latest
+```
 
 
-👉 [Compare Beekeeper Studio Editions](https://beekeeperstudio.io/get)
+### Como o Pipeline Otimiza o Desenvolvimento
+O pipeline CI/CD foi desenhado para otimizar o fluxo de desenvolvimento em várias maneiras:
 
+- Automação Completa: Desde o build até a publicação da imagem Docker, tudo é automatizado. Minimizando erros manuais e acelera o tempo de entrega.
+- Execução de Testes: Com a execução automática de testes a cada push no repositório, os desenvolvedores têm feedback imediato sobre o impacto das alterações.
+- Análise de Código: O uso de análise estática com CodeQL garante que o código mantido segue padrões de qualidade e segurança.
+- Publicação Automatizada: A imagem Docker é construída e publicada no Docker Hub automaticamente, simplificando o processo de distribuição.
 
-## Beekeeper Studio Features
+## Como Configurar
 
-Top feature: It's smooth 🍫, fast 🏎, and you'll actually enjoy using it 🥰
+Para configurar e rodar o pipeline em seu próprio repositório, siga as instruções abaixo:
 
-- Truly cross-platform: Windows, MacOS, and Linux
-- Autocomplete SQL query editor with syntax highlighting
-- Tabbed interface, so you can multitask
-- Sort and filter table data to find just what you need
-- Sensible keyboard-shortcuts
-- Save queries for later
-- Query run-history, so you can find that one query you got working 3 days ago
-- Default dark theme
+### Configurar Segredos no GitHub:
+Acesse as configurações do repositório no GitHub e adicione os segredos DOCKER_HUB_USERNAME e DOCKER_HUB_TOKEN com suas credenciais do Docker Hub.
+### Verificar Dependências:
 
-Features exclusive to the full commercial edition ([available on our website](https://beekeeperstudio.io/get)):
+- Certifique de que todas as dependências, como Node.js e Yarn, estão corretamente configuradas no repositório.
+Verificar Permissões do Docker Hub:
 
-- More themes
-- Online storage for queries and connections with [Workspaces](https://www.beekeeperstudio.io/features/workspace)
-- Easy data formatting with [Query magics](https://docs.beekeeperstudio.io/docs/query-magics)
-- Multi-table export (v4+)
-- Easy database backup using native tools (v4+)
-- Easy database restore using native tools (coming soon)
-- Oracle Database support
-- Cassandra database support
+- Assegure de que o repositório do Docker Hub está configurado para aceitar pushes das imagens Docker.
 
-One of our frustrations with other open-source SQL editors and database managers is that they take a 'kitchen sink' approach to features, adding so many features that the UI becomes cluttered and hard to navigate. We wanted a good looking, open source SQL workbench that's powerful, but also easy to use. We couldn't find one, so we created Beekeeper Studio!
+## Dockerfile
 
+O Dockerfile criado permite que o Beekeeper Studio seja executado como um contêiner Docker. Isso facilita o uso em diferentes ambientes, sem a necessidade de instalação manual de dependências.
 
-## Supporting Beekeeper Studio
-
-I love working on Beekeeper Studio, and I'd love to keep growing and improving it forever. To do that I need your help.
-
-The best way to support Beekeeper Studio is to purchase the [Ultimate Edition](https://beekeeperstudio.io/get). Every purchase directly supports my work on Beekeeper Studio.
-
-If you can't afford a license, please consider [becoming a project sponsor](https://github.com/sponsors/beekeeper-studio).
-
-Thank you for your continued support!
-
-
-## Documentation
-
-Check out [docs.beekeeperstudio.io](https://docs.beekeeperstudio.io) for user guides, FAQs, troubleshooting tips, and more.
-
-## License
-
-Beekeeper Studio Community Edition (the code in this repository) is licensed under the GPLv3 license.
-
-Beekeeper Studio Ultimate Edition contains extra features and is licensed under a [commercial end user agreement (EULA)](https://beekeeperstudio.io/legal/commercial-eula/).
-
-Beekeeper Studio's trademarks (words marks and logos) are not open source. See our [trademark guidelines](https://beekeeperstudio.io/legal/trademark/) for more information.
-
-## Trademark Guidelines
-
-Trademarks can be complicated with open source projects, so we have adapted a set of standard guidelines for using our trademarks that are common to many open source projects.
-
-If you are just using the Beekeeper Studio app, and you are not forking or distributing Beekeeper Studio code in any way, these probably don't apply to you.
-
-👉 [Beekeeper Studio Trademark Guidelines](https://beekeeperstudio.io/legal/trademark/)
-
-## Contributing to Beekeeper Studio
-
-We love *any* community engagement. Even if you're complaining because you don't like something about the app!
-
-
-### Contributor Agreements
-
-- Building an inclusive and welcoming community is important to us, so please follow our [code of conduct](code_of_conduct.md) as you engage with the project.
-
-- By contributing to the project you agree to the terms of our [contributor guidelines](CONTRIBUTING.md).
-
-### Contribute without coding
-
-We have you covered, read our [guide to contributing in 10 minutes without coding](https://github.com/beekeeper-studio/beekeeper-studio/issues/287).
-
-### Compiling and Running Beekeeper Studio Locally
-
-Want to write some code and improve Beekeeper Studio? Getting set-up is easy on Mac, Linux, or Windows.
+Para executar a aplicação em seu ambiente local, após baixar a imagem Docker, utilize o seguinte comando:
 
 ```bash
-# First: Install NodeJS 16, NPM, and Yarn
-# ...
-
-# 1. Fork the Beekeeper Studio Repo (click fork button at top right of this screen)
-# 2. Check out your fork:
-git clone git@github.com:<your-username>/beekeeper-studio.git beekeeper-studio
-cd beekeeper-studio/
-yarn install # installs dependencies
-
-
-# Now you can start the app:
-yarn run electron:serve ## the app will now start
+docker run --name beekeeper-studio \
+    --privileged \
+    -e DISPLAY=$DISPLAY \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v $HOME/.Xauthority:/root/.Xauthority \
+    --net=host \
+    matheusrfa/beekeeper-studio:latest
 ```
 
-**If you get `error:03000086:digital envelope routines::initialization error`, you'll have to update openssl.**
+## Conclusão
 
-- On Ubuntu/Debian:
-```
-sudo apt-get update
-sudo apt-get upgrade openssl
-```
+ Este estudo de caso examinou como configurar um pipeline CI/CD usando o GitHub Actions para construir, testar, analisar e publicar uma aplicação dockerizada chamada Beekeeper Studio. A implementação deste pipeline mostrou a importância e os benefícios da integração contínua e da entrega contínua em projetos de software e demonstrou como a automação pode garantir a qualidade do código e otimizar o fluxo de trabalho.
 
-- On CentOS/RHEL:
-```
-sudo yum update openssl
-```
+A capacidade do pipeline de garantir que cada alteração no código fosse automaticamente verificada por meio de testes e análises e garantir que as imagens Docker fossem construídas e publicadas de forma confiável foi demonstrada por meio das etapas descritas. O uso das Actions do GitHub facilitou a integração com o Docker Hub e a automação das tarefas críticas do desenvolvimento de software.
 
-- On macOS (using Homebrew):
-```
-brew update
-brew upgrade openssl
-```
+O estudo também mostrou a escalabilidade e a flexibilidade das práticas de CI/CD, que permitem o desenvolvimento de software mais ágil e com menos probabilidade de erros. A configuração do pipeline também enfatiza a necessidade de uma abordagem bem estruturada e documentada para a automação de processos, pois facilita a escalabilidade e a manutenção das soluções adotadas.
 
-### Where to make changes?
+## Créditos
 
-This repo is now a monorepo, we have several places with code, but only really a couple of important entry points.
+Este projeto é baseado no [Beekeeper Studio](https://github.com/beekeeper-studio/beekeeper-studio), uma aplicação para gerenciamento de bancos de dados. Todos os créditos pelo desenvolvimento da aplicação original vão para os mantenedores do repositório oficial.
 
-All app code lives in `apps/studio`, some shared code lives in `shared/src`. This is shared with other apps.
-
-Beekeeper Studio has two entry points:
-- `background.js` - this is the electron-side code that controls native things like showing windows.
-- `main.js` - this is the entry point for the Vue.js app. You can follow the Vue component breadcrumbs from `App.vue` to find the screen you need.
-
-**Generally we have two 'screens':**
-- ConnectionInterface - connecting to a DB
-- CoreInterface - interacting with a database
-
-### How to submit a change?
-
-
-- Push your changes to your repository and open a Pull Request from our github page (this page)
-- Make sure to write some notes about what your change does! A gif is always welcome for visual changes.
-
-## Maintainer notes (casual readers can ignore this stuff)
-
-### Upgrading Electron Gotchas
-
-This is always a total pain and will break the build 9/10.
-
-Some things you need to consider when upgrading Electron:
-
-1. Does it use a different node version. Eg Electron-18 uses node 14, 22 uses node 16. So everyone needs to upgrade
-2. Does node-abi need to be upgraded to be able to understand the electron version? This is used in the build to fetch prebuilt packages. You need to upgrade this in root/package.json#resolutions
-3. Were any APIs deprecated or removed? Make sure all features that interact with the Electron APIs still work, stuff like - selecting a file, maximizing a window, running a query, etc.
-
-
-### Release Process
-
-1. Up the version number in package.json
-2. Replace `build/release-notes.md` with the latest release notes. Follow the format that is there.
-  - run `git log <last-tag>..HEAD --oneline | grep 'Merge pull'` to find PRs merged
-2. Commit
-3. Push to master
-4. Create a tag `git tag v<version>`. It must start with a 'v'
-5. `git push origin <tagname>`
-  - Now wait for the build/publish action to complete on Github
-6. Push the new release live
-  - Go to the new 'draft' release on the releases tab of github, edit the notes, publish
-  - Log into snapcraft.io, drag the uploaded release into the 'stable' channel for each architecture.
-
-This should also publish the latest docs
-
-Post Release:
-1. Copy release notes to a blog post, post on website
-2. Tweet link
-3. Share on LinkedIn
-4. Send to mailing list on SendInBlue
-
-
-## Big Thanks
-
-Beekeeper Studio wouldn't exist without [Sqlectron-core](https://github.com/sqlectron/sqlectron-core), the core database libraries from the [Sqlectron project](https://github.com/sqlectron/sqlectron-gui). Beekeeper Studio started as an experimental fork of that repository. A big thanks to @maxcnunes and the rest of the Sqlectron community.
-
-The original license from sqlectron-core is included here:
-
-```
-Copyright (c) 2015 The SQLECTRON Team
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-'Software'), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
+Este fork foi criado exclusivamente para fins de estudo e experimentação com CI/CD e Docker. Caso tenha interesse na aplicação, recomenda-se visitar o repositório oficial para obter a versão mais atual e estável.
