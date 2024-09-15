@@ -24,7 +24,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
   test:
-    # needs: build
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
       - run: yarn test:ci
 
   analyze:
-    # needs: build
+    needs: build
     name: Analyze Code Quality
     runs-on: ubuntu-latest
     permissions:
@@ -56,7 +56,7 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: javascript
+          languages: javascript,typescript,html,css
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
       - name: Upload CodeQL Results
@@ -65,24 +65,24 @@ jobs:
           name: codeql-results
           path: codeql-results/
 
-  # publish:
-  #   needs: [test, analyze]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
+  publish:
+    needs: [test, analyze]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
       
-  #     - name: Login no Docker Hub
-  #       uses: docker/login-action@v1
-  #       with:
-  #         username: ${{ secrets.DOCKER_HUB_USERNAME }}
-  #         password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      - name: Login no Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-  #     - name: Construir e publicar imagem Docker
-  #       uses: docker/build-push-action@v2
-  #       with:
-  #         context: .
-  #         push: true
-  #         tags: |
-  #           ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:${{ github.sha }}
-  #           ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:latest
+      - name: Construir e publicar imagem Docker
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:${{ github.sha }}
+            ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:latest
