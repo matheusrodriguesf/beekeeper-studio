@@ -83,7 +83,7 @@ jobs:
           path: codeql-results/
 
   publish:
-    needs: test
+    needs: [test, analyze]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
