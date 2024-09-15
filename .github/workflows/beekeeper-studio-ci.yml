@@ -42,6 +42,7 @@ jobs:
       - run: yarn test:ci
 
   analyze:
+    needs: build
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
     permissions:
