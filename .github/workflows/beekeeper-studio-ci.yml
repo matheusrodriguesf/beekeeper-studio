@@ -39,9 +39,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - run: yarn install
+      - run: yarn add --dev jest-junit
+      - run: |
+          echo "module.exports = {
+            reporters: [
+              'default',
+              ['jest-junit', { outputDirectory: './test-results', outputName: 'results.xml' }]
+            ]
+          };" > jest.config.js
       - run: yarn test:ci
-      - name: Generate Test Report
-        run: yarn test:ci --reporter mocha-junit-reporter --reporter-options mochaFile=./test-results/results.xml
       - name: Upload Test Report
         uses: actions/upload-artifact@v3
         with:
@@ -90,24 +96,25 @@ jobs:
           name: codeql-results
           path: codeql-results/
 
-  # publish:
-  #   needs: [test, analyze]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
+  publish:
+    needs: [test, analyze]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
       
-  #     - name: Login no Docker Hub
-  #       uses: docker/login-action@v1
-  #       with:
-  #         username: ${{ secrets.DOCKER_HUB_USERNAME }}
-  #         password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      - name: Login no Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-  #     - name: Construir e publicar imagem Docker
-  #       uses: docker/build-push-action@v2
-  #       with:
-  #         context: .
-  #         push: true
-  #         tags: |
-  #           ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:${{ github.sha }}
-  #           ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:latest
+      - name: Construir e publicar imagem Docker
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:${{ github.sha }}
+            ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:latest
+
