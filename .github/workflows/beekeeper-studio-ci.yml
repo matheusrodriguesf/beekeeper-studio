@@ -4,27 +4,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Cache Yarn modules
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/yarn
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-      - run: yarn install
-      - run: yarn electron:build
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  # build:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+  #     - name: Cache Yarn modules
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: ~/.cache/yarn
+  #         key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-yarn-
+  #     - run: yarn install
+  #     - run: yarn electron:build
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
   test:
-    needs: build
+    # needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,82 +39,54 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - run: yarn install
-      - run: yarn add --dev jest-junit
-      - run: |
-          echo "module.exports = {
-            reporters: [
-              'default',
-              ['jest-junit', { outputDirectory: './test-results', outputName: 'results.xml' }]
-            ]
-          };" > jest.config.js
       - run: yarn test:ci
-      - name: Upload Test Report
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-results
-          path: ./test-results/results.xml
+      - name: Generate Test Reports
+        run: yarn test:report
+        env:
+          CI: true
 
   analyze:
-    needs: build
-    name: Analyze (${{ matrix.language }})
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    # needs: build
+    name: Analyze Code Quality
+    runs-on: ubuntu-latest
     permissions:
       security-events: write
       packages: read
       actions: read
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - language: javascript-typescript
-          build-mode: none
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-      - if: matrix.build-mode == 'manual'
-        shell: bash
-        run: |
-          echo 'Se você estiver usando um modo de compilação "manual" para uma ou mais das' \
-                'linguagens que está analisando, substitua isso pelos comandos para compilar' \
-                'seu código, por exemplo:'
-          echo '  make bootstrap'
-          echo '  make release'
-          exit 1
+          languages: javascript
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{matrix.language}}"
       - name: Upload CodeQL Results
         uses: actions/upload-artifact@v3
         with:
           name: codeql-results
           path: codeql-results/
 
-  publish:
-    needs: [test, analyze]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  # publish:
+  #   needs: [test, analyze]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
       
-      - name: Login no Docker Hub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+  #     - name: Login no Docker Hub
+  #       uses: docker/login-action@v1
+  #       with:
+  #         username: ${{ secrets.DOCKER_HUB_USERNAME }}
+  #         password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: Construir e publicar imagem Docker
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:${{ github.sha }}
-            ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:latest
-
+  #     - name: Construir e publicar imagem Docker
+  #       uses: docker/build-push-action@v2
+  #       with:
+  #         context: .
+  #         push: true
+  #         tags: |
+  #           ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:${{ github.sha }}
+  #           ${{ secrets.DOCKER_HUB_USERNAME }}/beekeeper-studio:latest
